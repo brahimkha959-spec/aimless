@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, orientation=landscape">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>حارس المنارة</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Segoe UI',Tahoma,sans-serif;touch-action:none;user-select:none;-webkit-user-select:none}
+#gameCanvas{display:block;width:100%;height:100%}
+#ui{position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:100}
+
+/* شريط الحالة العلوي للهاتف */
+#status-bar{position:fixed;top:0;left:0;right:0;height:22px;background:rgba(0,0,0,0.4);z-index:200;display:none;align-items:center;justify-content:center;pointer-events:none;backdrop-filter:blur(4px)}
+#status-bar.visible{display:flex}
+#status-bar span{color:rgba(255,255,255,0.35);font-size:10px;letter-spacing:1px}
+
+/* زر الشاشة الكاملة - أسفل اليسار */
+#fullscreen-btn{position:fixed;bottom:15px;left:15px;width:44px;height:44px;border-radius:50%;border:2px solid rgba(255,255,255,0.4);background:rgba(0,0,0,0.6);color:#fff;font-size:18px;display:none;align-items:center;justify-content:center;cursor:pointer;pointer-events:auto;z-index:110;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:all 0.15s;box-shadow:0 2px 10px rgba(0,0,0,0.4)}
+#fullscreen-btn:active{transform:scale(0.85);background:rgba(255,255,255,0.25);border-color:rgba(255,255,255,0.7)}
+#fullscreen-btn.visible{display:flex}
+
+/* زر الإعدادات - أسفل اليسار بجانب الشاشة الكاملة */
+#settings-btn{position:fixed;bottom:15px;left:68px;width:44px;height:44px;border-radius:50%;border:2px solid rgba(255,255,255,0.4);background:rgba(0,0,0,0.6);color:#fff;font-size:18px;display:none;align-items:center;justify-content:center;cursor:pointer;pointer-events:auto;z-index:110;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:all 0.15s;box-shadow:0 2px 10px rgba(0,0,0,0.4)}
+#settings-btn:active{transform:scale(0.85) rotate(45deg);background:rgba(255,255,255,0.25);border-color:rgba(255,255,255,0.7)}
+#settings-btn.visible{display:flex}
+
+#crosshair{position:fixed;top:50%;left:50%;width:24px;height:24px;transform:translate(-50%,-50%);pointer-events:none;z-index:101}
+#crosshair::before,#crosshair::after{content:'';position:absolute;background:rgba(255,255,255,0.8);box-shadow:0 0 8px rgba(255,255,255,0.5)}
+#crosshair::before{top:11px;left:0;width:24px;height:2px}
+#crosshair::after{top:0;left:11px;width:2px;height:24px}
+#crosshair-dot{position:absolute;top:10px;left:10px;width:4px;height:4px;background:rgba(255,50,50,0.9);border-radius:50%;box-shadow:0 0 6px rgba(255,0,0,0.8)}
+#hud-top{position:fixed;top:0;left:0;right:0;padding:10px 15px;display:flex;justify-content:space-between;align-items:flex-start;background:linear-gradient(to bottom,rgba(0,0,0,0.8),transparent);pointer-events:none}
+.hud-section{display:flex;flex-direction:column;gap:5px}
+#health-container{display:flex;align-items:center;gap:8px}
+#health-bar{width:130px;height:18px;background:rgba(0,0,0,0.5);border:2px solid rgba(255,255,255,0.25);border-radius:9px;overflow:hidden;box-shadow:inset 0 1px 3px rgba(0,0,0,0.5)}
+#health-fill{width:100%;height:100%;background:linear-gradient(90deg,#aa0000,#ff4444,#ff6666);transition:width 0.3s ease}
+#health-icon{font-size:20px;filter:drop-shadow(0 0 6px rgba(255,0,0,0.6))}
+.hud-text{color:#fff;font-size:14px;font-weight:600;text-shadow:0 0 10px rgba(0,0,0,0.9),0 1px 3px rgba(0,0,0,0.8);letter-spacing:0.5px}
+.hud-text.battery{color:#ffdd33}
+.hud-text.score{color:#55ff99}
+.hud-text.mission{color:#ff9955}
+#inventory-bar{position:fixed;top:55px;left:50%;transform:translateX(-50%);display:flex;gap:10px;z-index:102;pointer-events:none}
+.inv-slot{width:48px;height:48px;border:2px solid rgba(255,255,255,0.25);border-radius:10px;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;font-size:24px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:all 0.3s;box-shadow:0 2px 8px rgba(0,0,0,0.3)}
+.inv-slot.active{border-color:#44ff88;box-shadow:0 0 20px rgba(68,255,136,0.5);background:rgba(68,255,136,0.15);transform:scale(1.1)}
+.inv-slot.empty{color:rgba(255,255,255,0.25);font-size:14px}
+
+/* شاشة الإعدادات */
+#settingsScreen{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.93);display:none;flex-direction:column;justify-content:center;align-items:center;z-index:400;pointer-events:auto;padding:20px}
+#settingsScreen.visible{display:flex}
+.settings-title{color:#ff4444;font-size:26px;margin-bottom:15px;text-shadow:0 0 20px rgba(255,0,0,0.4)}
+.settings-card{width:90%;max-width:400px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:20px;margin-bottom:14px;box-shadow:0 4px 20px rgba(0,0,0,0.2)}
+.setting-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.setting-row:last-child{margin-bottom:0}
+.setting-label{color:#ccc;font-size:14px}
+.setting-value{color:#ffcc00;font-size:14px;font-weight:600;min-width:45px;text-align:left}
+.slider-container{width:100%;margin-top:6px}
+input[type=range]{-webkit-appearance:none;width:100%;height:8px;border-radius:4px;background:rgba(255,255,255,0.15);outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#ff4444;cursor:pointer;box-shadow:0 0 10px rgba(255,0,0,0.5);border:2px solid #fff}
+input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#ff4444;cursor:pointer;box-shadow:0 0 10px rgba(255,0,0,0.5);border:2px solid #fff}
+.toggle-switch{position:relative;width:48px;height:24px;background:rgba(255,255,255,0.2);border-radius:12px;cursor:pointer;transition:background 0.3s}
+.toggle-switch.active{background:#44ff88}
+.toggle-switch::after{content:'';position:absolute;width:20px;height:20px;background:#fff;border-radius:50%;top:2px;left:2px;transition:transform 0.3s}
+.toggle-switch.active::after{transform:translateX(24px)}
+.settings-btn{padding:12px 45px;font-size:18px;background:rgba(255,68,68,0.1);color:#fff;border:2px solid #ff4444;border-radius:10px;cursor:pointer;transition:all 0.2s;font-family:inherit;margin-top:12px;font-weight:600;letter-spacing:1px;box-shadow:0 4px 15px rgba(255,68,68,0.15)}
+.settings-btn:active{background:#ff4444;transform:scale(0.95);box-shadow:0 0 30px rgba(255,68,68,0.4)}
+
+#controls{position:fixed;bottom:0;left:0;right:0;padding:15px 20px;padding-bottom:max(15px,env(safe-area-inset-bottom));display:flex;justify-content:space-between;align-items:flex-end;pointer-events:none;z-index:102}
+.control-area{pointer-events:auto;display:flex;gap:12px;align-items:flex-end}
+#joystick-zone{position:relative;width:140px;height:140px;margin-bottom:5px}
+#joystick-base{position:absolute;width:140px;height:140px;border:3px solid rgba(255,255,255,0.2);border-radius:50%;background:rgba(255,255,255,0.03);box-shadow:inset 0 0 20px rgba(255,255,255,0.05)}
+#joystick-stick{position:absolute;width:50px;height:50px;top:45px;left:45px;border-radius:50%;background:rgba(255,255,255,0.25);border:2px solid rgba(255,255,255,0.6);box-shadow:0 0 20px rgba(255,255,255,0.15),0 4px 10px rgba(0,0,0,0.3);transition:transform 0.05s}
+#joystick-stick.active{background:rgba(255,255,255,0.45);box-shadow:0 0 25px rgba(255,255,255,0.3);border-color:#fff}
+.action-btn{width:60px;height:60px;border-radius:50%;border:2px solid rgba(255,255,255,0.35);background:rgba(0,0,0,0.4);color:#fff;font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;pointer-events:auto;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:all 0.12s;box-shadow:0 4px 15px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.1)}
+.action-btn:active{transform:scale(0.88);background:rgba(255,255,255,0.2);border-color:rgba(255,255,255,0.7)}
+.action-btn.flashlight-btn{border-color:rgba(255,204,0,0.6);background:rgba(255,204,0,0.12);font-size:26px;box-shadow:0 4px 15px rgba(0,0,0,0.4),0 0 15px rgba(255,204,0,0.1),inset 0 1px 0 rgba(255,255,255,0.1)}
+.action-btn.flashlight-btn.off{border-color:rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);opacity:0.4;box-shadow:none}
+.action-btn.flashlight-btn:active{background:rgba(255,204,0,0.3);box-shadow:0 0 25px rgba(255,204,0,0.3)}
+.action-btn.action-btn-big{width:72px;height:72px;border-color:rgba(100,200,255,0.6);background:rgba(100,200,255,0.12);font-size:28px;box-shadow:0 4px 15px rgba(0,0,0,0.4),0 0 15px rgba(100,200,255,0.1),inset 0 1px 0 rgba(255,255,255,0.1)}
+.action-btn.action-btn-big:active{background:rgba(100,200,255,0.35);box-shadow:0 0 25px rgba(100,200,255,0.3)}
+
+.screen{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.93);display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:300;pointer-events:auto;padding:20px}
+.screen.hidden{display:none!important}
+h1{color:#ff3333;font-size:36px;text-shadow:0 0 30px rgba(255,0,0,0.5),0 0 60px rgba(255,0,0,0.2);margin-bottom:8px;letter-spacing:2px;text-align:center}
+h2{color:#ff5555;font-size:26px;text-shadow:0 0 20px rgba(255,0,0,0.4);margin-bottom:15px;text-align:center}
+.subtitle{color:#aaa;font-size:14px;margin-bottom:25px;text-align:center;line-height:1.8;max-width:380px}
+.btn{padding:12px 40px;font-size:20px;background:transparent;color:#fff;border:2px solid #ff4444;border-radius:8px;cursor:pointer;transition:all 0.3s;font-family:inherit;margin:8px;font-weight:600;letter-spacing:1px}
+.btn:active{background:#ff4444;box-shadow:0 0 30px rgba(255,0,0,0.5);transform:scale(1.05)}
+#damage-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:radial-gradient(circle,transparent 30%,rgba(255,0,0,0.5) 100%);opacity:0;pointer-events:none;transition:opacity 0.15s;z-index:50}
+#flash-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(255,255,200,0.3);opacity:0;pointer-events:none;transition:opacity 0.1s;z-index:49}
+#pickup-prompt{position:fixed;top:35%;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.8);border:2px solid #44ff88;border-radius:10px;padding:12px 24px;color:#44ff88;font-size:16px;font-weight:600;z-index:110;pointer-events:none;opacity:0;transition:opacity 0.3s;text-shadow:0 0 10px rgba(68,255,136,0.5)}
+#pickup-prompt.visible{opacity:1}
+#mission-prompt{position:fixed;bottom:120px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);border:2px solid #ff8844;border-radius:10px;padding:10px 20px;color:#ffaa66;font-size:14px;font-weight:600;z-index:110;pointer-events:none;opacity:0;transition:opacity 0.5s;text-align:center;max-width:300px;line-height:1.6}
+#mission-prompt.visible{opacity:1}
+.instructions{color:#777;font-size:13px;margin-top:15px;text-align:center;line-height:2}
+#rotate-screen{position:fixed;top:0;left:0;right:0;bottom:0;background:#000;display:none;flex-direction:column;justify-content:center;align-items:center;z-index:999;color:#fff;font-size:18px;text-align:center;padding:20px}
+#rotate-screen.visible{display:flex}
+@media (orientation:portrait){#rotate-screen{display:flex}#gameCanvas,#ui,.screen{display:none!important}}
+@media (orientation:landscape){#rotate-screen{display:none}}
+
+/* Fullscreen styles */
+:fullscreen{background:#000}
+:-webkit-full-screen{background:#000}
+:-moz-full-screen{background:#000}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+<div id="damage-overlay"></div>
+<div id="flash-overlay"></div>
+<div id="pickup-prompt"></div>
+<div id="mission-prompt"></div>
+<div id="rotate-screen"><div style="font-size:50px;margin-bottom:15px">📱↔️</div><div>يرجى تدوير الهاتف للوضع الأفقي</div></div>
+
+<!-- شريط حالة -->
+<div id="status-bar"><span>🎮 حارس المنارة - وضع اللعب</span></div>
+
+<!-- أزرار التحكم العلوية -->
+<div id="fullscreen-btn" title="شاشة كاملة">⛶</div>
+<div id="settings-btn" title="الإعدادات">⚙️</div>
+
+<!-- شاشة الإعدادات -->
+<div id="settingsScreen">
+<div class="settings-title">⚙️ الإعدادات</div>
+<div class="settings-card">
+<div class="setting-row"><div class="setting-label">حساسية النظر</div><div class="setting-value" id="lookSensValue">50%</div></div>
+<div class="slider-container"><input type="range" id="lookSensSlider" min="10" max="200" value="50"></div>
+<div class="setting-row" style="margin-top:12px"><div class="setting-label">حساسية الحركة</div><div class="setting-value" id="moveSensValue">50%</div></div>
+<div class="slider-container"><input type="range" id="moveSensSlider" min="30" max="150" value="50"></div>
+</div>
+<div class="settings-card">
+<div class="setting-row"><div class="setting-label">وضع النظر باللمس</div><div class="toggle-switch active" id="touchLookToggle"></div></div>
+<div class="setting-row" style="margin-top:12px"><div class="setting-label">تنعيم الكاميرا</div><div class="toggle-switch active" id="smoothToggle"></div></div>
+<div class="setting-row" style="margin-top:12px"><div class="setting-label">إظهار ذراع التحكم</div><div class="toggle-switch active" id="showJoystickToggle"></div></div>
+<div class="setting-row" style="margin-top:12px"><div class="setting-label">منع إطفاء الشاشة</div><div class="toggle-switch active" id="wakeLockToggle"></div></div>
+</div>
+<div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;justify-content:center">
+<button class="settings-btn" id="closeSettingsBtn">💾 حفظ وإغلاق</button>
+<button class="settings-btn" id="exitSettingsBtn" style="border-color:#888">❌ خروج بدون حفظ</button>
+</div>
+<div style="margin-top:10px">
+<button class="settings-btn" id="quitGameBtn" style="border-color:#ff4444;background:rgba(255,68,68,0.15)">🚪 خروج من اللعبة</button>
+</div>
+</div>
+
+<div id="ui">
+<div id="hud-top">
+<div class="hud-section">
+<div id="health-container"><span id="health-icon">❤️</span><div id="health-bar"><div id="health-fill"></div></div></div>
+<div class="hud-text score" id="score-text">النقاط: 0</div>
+</div>
+<div class="hud-section" style="text-align:left">
+<div class="hud-text mission" id="mission-text">ابحث عن الصندوق في وسط الجزيرة</div>
+<div class="hud-text" id="ghosts-text">الأطياف: 0</div>
+<div class="hud-text battery" id="battery-text">🔋 100%</div>
+</div>
+</div>
+<div id="inventory-bar">
+<div class="inv-slot" id="slot-battery" title="بطارية">🔋</div>
+<div class="inv-slot empty" id="slot-button">🔲</div>
+</div>
+<div id="crosshair"><div id="crosshair-dot"></div></div>
+<div id="controls">
+<div class="control-area">
+<div id="joystick-zone"><div id="joystick-base"></div><div id="joystick-stick"></div></div>
+</div>
+<div class="control-area">
+<div class="action-btn action-btn-big" id="actionBtn">👆</div>
+
+<div class="action-btn flashlight-btn" id="flashBtn">🔦</div>
+</div>
+</div>
+</div>
+<div id="startScreen" class="screen">
+<h1>🏰 حارس المنارة</h1>
+<div class="subtitle">
+المنارة تخمد أضواؤها... والأطياف تقترب!<br>
+أنت بحاجة لـ <b>زر الطوارئ</b> المخبأ في صندوق وسط الجزيرة<br>
+اجمع البطاريات، احمِ نفسك، وأعد إضاءة المنارة
+</div>
+<button class="btn" id="startBtn">ابدأ اللعبة</button>
+<div class="instructions">
+🎮 Joystick - الحركة | 👁️ النظر - تحريك الكاميرا<br>
+👆 زر الإجراء - جمع/فتح | 🔦 الكشاف - تشغيل/إطفاء<br>
+⚙️ الإعدادات - تعديل حساسية النظر والحركة
+</div>
+</div>
+<div id="gameOverScreen" class="screen hidden">
+<h2 id="endTitle">انتهت اللعبة</h2>
+<div class="subtitle" id="endMessage"></div>
+<div class="subtitle" id="finalScore" style="color:#ffcc00;font-size:20px"></div>
+<button class="btn" id="restartBtn">إعادة المحاولة</button>
+</div>
+<script>
+
+// ==================== نظام الشاشة الكاملة وقفل الشاشة ====================
+let wakeLockObj = null;
+let isFullscreen = false;
+
+async function enterFullscreen() {
+    const el = document.documentElement;
+    try {
+        if (el.requestFullscreen) await el.requestFullscreen();
+        else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
+        else if (el.mozRequestFullScreen) await el.mozRequestFullScreen();
+        else if (el.msRequestFullscreen) await el.msRequestFullscreen();
+        isFullscreen = true;
+        document.getElementById('fullscreen-btn').textContent = '⛶';
+    } catch(e) { console.log('Fullscreen not supported'); }
+}
+
+async function exitFullscreen() {
+    try {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
+        else if (document.mozCancelFullScreen) await document.mozCancelFullScreen();
+        else if (document.msExitFullscreen) await document.msExitFullscreen();
+        isFullscreen = false;
+        document.getElementById('fullscreen-btn').textContent = '⛶';
+    } catch(e) {}
+}
+
+function toggleFullscreen() {
+    if (isFullscreen || document.fullscreenElement || document.webkitFullscreenElement) {
+        exitFullscreen();
+    } else {
+        enterFullscreen();
+    }
+}
+
+async function requestWakeLock() {
+    if (!settings.wakeLock) return;
+    try {
+        if ('wakeLock' in navigator) {
+            wakeLockObj = await navigator.wakeLock.request('screen');
+            wakeLockObj.addEventListener('release', () => {
+                wakeLockObj = null;
+            });
+        }
+    } catch(e) { console.log('Wake Lock not supported'); }
+}
+
+async function releaseWakeLock() {
+    if (wakeLockObj) {
+        try { await wakeLockObj.release(); } catch(e) {}
+        wakeLockObj = null;
+    }
+}
+
+// ==================== نظام الإعدادات ====================
+const DEFAULT_SETTINGS = {
+    lookSensitivity: 50,
+    moveSensitivity: 50,
+    touchLookMode: true,
+    smoothCamera: true,
+    showJoystick: true,
+    wakeLock: true
+};
+
+let settings = { ...DEFAULT_SETTINGS };
+
+function loadSettings() {
+    try {
+        const saved = localStorage.getItem('lighthouse_settings_v2');
+        if (saved) settings = { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
+    } catch(e) {}
+    applySettings();
+}
+
+function saveSettings() {
+    try { localStorage.setItem('lighthouse_settings_v2', JSON.stringify(settings)); } catch(e) {}
+}
+
+function applySettings() {
+    document.getElementById('lookSensSlider').value = settings.lookSensitivity;
+    document.getElementById('lookSensValue').textContent = settings.lookSensitivity + '%';
+    document.getElementById('moveSensSlider').value = settings.moveSensitivity;
+    document.getElementById('moveSensValue').textContent = settings.moveSensitivity + '%';
+    document.getElementById('touchLookToggle').classList.toggle('active', settings.touchLookMode);
+    document.getElementById('smoothToggle').classList.toggle('active', settings.smoothCamera);
+    document.getElementById('showJoystickToggle').classList.toggle('active', settings.showJoystick);
+    document.getElementById('wakeLockToggle').classList.toggle('active', settings.wakeLock);
+    document.getElementById('joystick-zone').style.display = settings.showJoystick ? 'block' : 'none';
+}
+
+function openSettings() {
+    if (!isGameActive) return;
+    isPaused = true;
+    releaseWakeLock();
+    document.getElementById('settingsScreen').classList.add('visible');
+}
+
+function closeSettings() {
+    document.getElementById('settingsScreen').classList.remove('visible');
+    isPaused = false;
+    prevTime = performance.now();
+    if (settings.wakeLock) requestWakeLock();
+}
+
+// ==================== المتغيرات ====================
+let scene, camera, renderer;
+let flashlightLight, flashlightSpot;
+let ghosts = [];
+let particles = [];
+let batteries = [];
+let health = 100;
+let score = 0;
+let battery = 100;
+let ghostsKilled = 0;
+let totalGhosts = 30;
+let isGameActive = false;
+let isPaused = false;
+let isFlashlightOn = true;
+
+let clock = new THREE.Clock();
+let playerVelocity = new THREE.Vector3();
+let moveVector = new THREE.Vector2(0, 0);
+let cameraRotation = { x: 0, y: 0 };
+let targetRotation = { x: 0, y: 0 };
+let joystickActive = false;
+let joystickStart = { x: 0, y: 0 };
+let joystickStick = document.getElementById('joystick-stick');
+let joystickZone = document.getElementById('joystick-zone');
+let lookTouchId = null;
+let lookStartPos = { x: 0, y: 0 };
+let lookCurrentPos = { x: 0, y: 0 };
+let lighthouseGroup, lighthouseBeam;
+let waterMesh;
+let hasButton = false;
+let buttonInstalled = false;
+let chestOpened = false;
+let missionStage = 0;
+let chestMesh, chestLid, buttonMesh;
+let lighthouseSaved = false;
+let prevTime = performance.now();
+
+// ==================== الإعداد ====================
+function init() {
+    scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x050510, 0.015);
+    scene.background = new THREE.Color(0x020208);
+    camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 300);
+    camera.rotation.order = 'YXZ';
+    camera.position.set(0, 3, 15);
+    renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'low-power' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+    const moonLight = new THREE.DirectionalLight(0x334466, 0.4);
+    moonLight.position.set(30, 80, 30);
+    moonLight.castShadow = true;
+    moonLight.shadow.mapSize.width = 1024;
+    moonLight.shadow.mapSize.height = 1024;
+    scene.add(moonLight);
+    const ambient = new THREE.AmbientLight(0x111122, 0.5);
+    scene.add(ambient);
+    createWorld();
+    createLighthouse();
+    createWater();
+    createEnvironment();
+    createParticles();
+    createBatteries();
+    createChest();
+    setupFlashlight();
+    setupControls();
+    setupSettings();
+    loadSettings();
+    window.addEventListener('resize', onWindowResize);
+
+    // Listen for fullscreen changes
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+    document.addEventListener('mozfullscreenchange', onFullscreenChange);
+    document.addEventListener('MSFullscreenChange', onFullscreenChange);
+}
+
+function onFullscreenChange() {
+    isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+    document.getElementById('fullscreen-btn').textContent = isFullscreen ? '⛶' : '⛶';
+}
+
+// ==================== العالم ====================
+function createWorld() {
+    const islandGeo = new THREE.CylinderGeometry(60, 70, 3, 64);
+    const island = new THREE.Mesh(islandGeo, new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.95, metalness: 0.05 }));
+    island.position.y = -1.5; island.receiveShadow = true; scene.add(island);
+    for (let i = 0; i < 80; i++) {
+        const hill = new THREE.Mesh(new THREE.SphereGeometry(Math.random() * 2 + 0.5, 8, 6), new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(0, 0, 0.08 + Math.random() * 0.05), roughness: 1 }));
+        const a = Math.random() * Math.PI * 2, d = Math.random() * 50;
+        hill.position.set(Math.cos(a) * d, -0.5 + Math.random() * 1, Math.sin(a) * d);
+        hill.scale.y = 0.3; scene.add(hill);
+    }
+    for (let i = 0; i < 40; i++) {
+        const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(Math.random() * 1.5 + 0.3, 0), new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(0, 0, 0.15 + Math.random() * 0.1), roughness: 0.9 }));
+        const a = Math.random() * Math.PI * 2, d = Math.random() * 55 + 2;
+        rock.position.set(Math.cos(a) * d, 0.2 + Math.random() * 0.5, Math.sin(a) * d);
+        rock.rotation.set(Math.random()*3, Math.random()*3, Math.random()*3);
+        rock.castShadow = true; scene.add(rock);
+    }
+    for (let i = 0; i < 25; i++) {
+        const tree = new THREE.Group();
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.4, 4, 6), new THREE.MeshStandardMaterial({ color: 0x221100, roughness: 0.9 }));
+        trunk.position.y = 2; tree.add(trunk);
+        for (let j = 0; j < 4; j++) {
+            const branch = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.1, 2, 4), new THREE.MeshStandardMaterial({ color: 0x221100, roughness: 0.9 }));
+            branch.position.y = 3 + Math.random(); branch.rotation.z = (Math.random()-0.5)*1.5; branch.rotation.y = Math.random()*Math.PI*2;
+            tree.add(branch);
+        }
+        const a = Math.random()*Math.PI*2, d = Math.random()*45+5;
+        tree.position.set(Math.cos(a)*d, 0, Math.sin(a)*d);
+        tree.rotation.z = (Math.random()-0.5)*0.3; tree.castShadow = true; scene.add(tree);
+    }
+    for (let i = 0; i < 8; i++) {
+        const ruin = new THREE.Mesh(new THREE.BoxGeometry(Math.random()*3+1, Math.random()*2+0.5, Math.random()*3+1), new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 }));
+        const a = Math.random()*Math.PI*2, d = Math.random()*40+8;
+        ruin.position.set(Math.cos(a)*d, 0.5, Math.sin(a)*d); ruin.rotation.y = Math.random()*Math.PI;
+        ruin.castShadow = true; scene.add(ruin);
+    }
+}
+
+function createLighthouse() {
+    lighthouseGroup = new THREE.Group();
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(4,5,1.5,16), new THREE.MeshStandardMaterial({color:0x333333}));
+    base.position.y=0.75; base.castShadow=true; lighthouseGroup.add(base);
+    const tower = new THREE.Mesh(new THREE.CylinderGeometry(2.5,3.5,18,16), new THREE.MeshStandardMaterial({color:0xdddddd,roughness:0.3}));
+    tower.position.y=10; tower.castShadow=true; lighthouseGroup.add(tower);
+    for(let i=0;i<4;i++){const ring=new THREE.Mesh(new THREE.CylinderGeometry(2.6+i*0.2,2.7+i*0.2,1.2,16),new THREE.MeshStandardMaterial({color:0xaa2222}));ring.position.y=3+i*4.5;lighthouseGroup.add(ring);}
+    const room=new THREE.Mesh(new THREE.CylinderGeometry(4,2.8,3.5,16),new THREE.MeshStandardMaterial({color:0x222222}));
+    room.position.y=20.5; lighthouseGroup.add(room);
+    for(let i=0;i<4;i++){const win=new THREE.Mesh(new THREE.PlaneGeometry(1,1.5),new THREE.MeshBasicMaterial({color:0xffffaa,side:THREE.DoubleSide}));const a=(i/4)*Math.PI*2;win.position.set(Math.cos(a)*4,20.5,Math.sin(a)*4);win.lookAt(0,20.5,0);lighthouseGroup.add(win);}
+    const roof=new THREE.Mesh(new THREE.ConeGeometry(4.5,3.5,16),new THREE.MeshStandardMaterial({color:0x991111}));
+    roof.position.y=24; lighthouseGroup.add(roof);
+    lighthouseBeam=new THREE.SpotLight(0xffffaa,0.5,250,Math.PI/8,0.3,1);
+    lighthouseBeam.position.set(0,20.5,0); lighthouseBeam.castShadow=true; lighthouseGroup.add(lighthouseBeam);
+    const bt=new THREE.Object3D(); bt.position.set(30,20.5,0); lighthouseGroup.add(bt); lighthouseBeam.target=bt;
+    const bulb=new THREE.Mesh(new THREE.SphereGeometry(1,16,16),new THREE.MeshBasicMaterial({color:0x443322}));
+    bulb.position.y=20.5; lighthouseGroup.add(bulb);
+    const glow=new THREE.Mesh(new THREE.SphereGeometry(3,16,16),new THREE.MeshBasicMaterial({color:0xffffaa,transparent:true,opacity:0.05}));
+    glow.position.y=20.5; lighthouseGroup.add(glow);
+    lighthouseGroup.position.set(-8,0,-8); scene.add(lighthouseGroup);
+    const zone=new THREE.Mesh(new THREE.RingGeometry(5,7,32),new THREE.MeshBasicMaterial({color:0xffff00,transparent:true,opacity:0.1,side:THREE.DoubleSide}));
+    zone.rotation.x=-Math.PI/2; zone.position.set(-8,0.1,-8); zone.userData={isInstallZone:true}; scene.add(zone);
+}
+
+function createWater() {
+    const waterMat = new THREE.MeshStandardMaterial({color:0x001133,transparent:true,opacity:0.85,roughness:0.05,metalness:0.9,side:THREE.DoubleSide});
+    waterMesh = new THREE.Mesh(new THREE.PlaneGeometry(400,400,60,60), waterMat);
+    waterMesh.rotation.x=-Math.PI/2; waterMesh.position.y=-2.5; scene.add(waterMesh);
+}
+
+function createEnvironment() {
+    for(let i=0;i<10;i++){const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.15,3,6),new THREE.MeshStandardMaterial({color:0x332211}));const a=Math.random()*Math.PI*2,d=Math.random()*30+10;pole.position.set(Math.cos(a)*d,1.5,Math.sin(a)*d);pole.rotation.z=(Math.random()-0.5)*0.4;scene.add(pole);}
+    for(let i=0;i<20;i++){const fence=new THREE.Mesh(new THREE.BoxGeometry(0.1,1.5,2),new THREE.MeshStandardMaterial({color:0x443322}));const a=(i/20)*Math.PI*2,d=58;fence.position.set(Math.cos(a)*d,0.75,Math.sin(a)*d);fence.rotation.y=-a;fence.rotation.z=(Math.random()-0.5)*0.3;scene.add(fence);}
+}
+
+function createParticles() {
+    const geo=new THREE.BufferGeometry();
+    const count=800, pos=new Float32Array(count*3);
+    for(let i=0;i<count;i++){pos[i*3]=(Math.random()-0.5)*120;pos[i*3+1]=Math.random()*15;pos[i*3+2]=(Math.random()-0.5)*120;}
+    geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+    const mat=new THREE.PointsMaterial({color:0x555577,size:0.15,transparent:true,opacity:0.3,sizeAttenuation:true});
+    const fog=new THREE.Points(geo,mat); scene.add(fog); particles.push(fog);
+}
+
+function createBatteries() {
+    const positions = [
+        {x:15,z:10},{x:-20,z:15},{x:25,z:-10},{x:-15,z:-20},
+        {x:30,z:20},{x:-25,z:5},{x:10,z:-25},{x:-30,z:-15},
+        {x:20,z:30},{x:5,z:35},{x:-10,z:-30},{x:35,z:-5}
+    ];
+    positions.forEach((pos, idx) => {
+        const g = new THREE.Group();
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,0.6,8), new THREE.MeshStandardMaterial({color:0x222222,roughness:0.5,metalness:0.3}));
+        body.position.y=0.3; g.add(body);
+        const top = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,0.1,8), new THREE.MeshStandardMaterial({color:0xffcc00,metalness:0.8,roughness:0.2}));
+        top.position.y=0.65; g.add(top);
+        const plus = new THREE.Mesh(new THREE.BoxGeometry(0.15,0.02,0.05), new THREE.MeshBasicMaterial({color:0xff0000}));
+        plus.position.set(0,0.3,0.16); g.add(plus);
+        const plus2 = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.02,0.15), new THREE.MeshBasicMaterial({color:0xff0000}));
+        plus2.position.set(0,0.3,0.16); g.add(plus2);
+        const glow = new THREE.Mesh(new THREE.SphereGeometry(0.5,8,8), new THREE.MeshBasicMaterial({color:0x44ff88,transparent:true,opacity:0.15}));
+        glow.position.y=0.3; g.add(glow);
+        g.position.set(pos.x,0,pos.z); g.userData={isBattery:true,id:idx,glowMesh:glow};
+        g.rotation.y=Math.random()*Math.PI; scene.add(g); batteries.push(g);
+    });
+}
+
+function createChest() {
+    const g = new THREE.Group();
+    const base = new THREE.Mesh(new THREE.BoxGeometry(1.5,0.8,1), new THREE.MeshStandardMaterial({color:0x4a3728,roughness:0.7}));
+    base.position.y=0.4; base.castShadow=true; g.add(base);
+    const edgeMat = new THREE.MeshStandardMaterial({color:0x665544,metalness:0.6,roughness:0.4});
+    for(let i=0;i<4;i++){const edge=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.85,0.05),edgeMat);const x=i<2?0.75:-0.75,z=i%2===0?0.5:-0.5;edge.position.set(x,0.4,z);g.add(edge);}
+    chestLid = new THREE.Mesh(new THREE.BoxGeometry(1.5,0.3,1), new THREE.MeshStandardMaterial({color:0x4a3728,roughness:0.7}));
+    chestLid.position.y=0.95; chestLid.position.z=-0.5; chestLid.geometry.translate(0,0,0.5); g.add(chestLid);
+    const lock = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.25,0.1), new THREE.MeshStandardMaterial({color:0x888888,metalness:0.8,roughness:0.3}));
+    lock.position.set(0,0.5,0.55); g.add(lock);
+    buttonMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,0.1,16), new THREE.MeshStandardMaterial({color:0xff0000,emissive:0xff0000,emissiveIntensity:0.5}));
+    buttonMesh.position.set(0,0.5,0); buttonMesh.visible=false; g.add(buttonMesh);
+    const cg = new THREE.Mesh(new THREE.SphereGeometry(2,16,16), new THREE.MeshBasicMaterial({color:0xffaa00,transparent:true,opacity:0.08}));
+    cg.position.y=0.5; g.add(cg);
+    g.position.set(0,0,0); g.userData={isChest:true,glowMesh:cg}; scene.add(g); chestMesh=g;
+}
+
+function setupFlashlight() {
+    flashlightSpot = new THREE.SpotLight(0xffffee,2.5,50,Math.PI/6,0.6,1);
+    flashlightSpot.castShadow=true; flashlightSpot.shadow.mapSize.width=512; flashlightSpot.shadow.mapSize.height=512;
+    scene.add(flashlightSpot); scene.add(flashlightSpot.target);
+    const coneGeo=new THREE.ConeGeometry(2,8,16,1,true);
+    const coneMat=new THREE.MeshBasicMaterial({color:0xffffaa,transparent:true,opacity:0.03,side:THREE.DoubleSide,depthWrite:false});
+    flashlightLight=new THREE.Mesh(coneGeo,coneMat); flashlightLight.rotation.x=-Math.PI/2; scene.add(flashlightLight);
+}
+
+function updateFlashlight() {
+    if(!isFlashlightOn||battery<=0){flashlightSpot.intensity=0;flashlightLight.visible=false;return;}
+    // التأكد من تحديث الكاميرا قبل قراءة الاتجاه
+    camera.updateMatrixWorld();
+    const dir=new THREE.Vector3(); camera.getWorldDirection(dir);
+    flashlightSpot.position.copy(camera.position); flashlightSpot.position.y-=0.3;
+    flashlightSpot.target.position.copy(camera.position).add(dir.multiplyScalar(20));
+    flashlightSpot.target.updateMatrixWorld(); flashlightSpot.intensity=2.5*(battery/100);
+    flashlightLight.visible=true; flashlightLight.position.copy(camera.position);
+    flashlightLight.quaternion.copy(camera.quaternion); flashlightLight.translateZ(-4); flashlightLight.rotateX(-Math.PI/2);
+    battery-=0.025; if(battery<0)battery=0;
+    document.getElementById('battery-text').textContent='🔋 '+Math.floor(battery)+'%';
+}
+
+function spawnGhost() {
+    const g=new THREE.Group();
+    const t=Math.random(); let color,speed,hp,size;
+    if(t<0.6){color=0x88ccff;speed=1.5;hp=80;size=1;}
+    else if(t<0.85){color=0xff6666;speed=2.5;hp=120;size=1.3;}
+    else{color=0xaa66ff;speed=3.5;hp=60;size=0.8;}
+    const body=new THREE.Mesh(new THREE.SphereGeometry(0.7*size,12,12),new THREE.MeshBasicMaterial({color:color,transparent:true,opacity:0.35}));
+    body.scale.y=1.6; g.add(body);
+    const eyeMat=new THREE.MeshBasicMaterial({color:0xffffff});
+    const le=new THREE.Mesh(new THREE.SphereGeometry(0.12*size,8,8),eyeMat);le.position.set(-0.2*size,0.3*size,0.5*size);g.add(le);
+    const re=new THREE.Mesh(new THREE.SphereGeometry(0.12*size,8,8),eyeMat);re.position.set(0.2*size,0.3*size,0.5*size);g.add(re);
+    const glow=new THREE.Mesh(new THREE.SphereGeometry(1.5*size,12,12),new THREE.MeshBasicMaterial({color:color,transparent:true,opacity:0.08}));g.add(glow);
+    const tail=new THREE.Mesh(new THREE.ConeGeometry(0.3*size,2*size,8),new THREE.MeshBasicMaterial({color:color,transparent:true,opacity:0.2}));
+    tail.position.y=-1.5*size; g.add(tail);
+    const a=Math.random()*Math.PI*2,d=55+Math.random()*15;
+    g.position.set(Math.cos(a)*d,2+Math.random()*3,Math.sin(a)*d);
+    g.userData={health:hp,maxHealth:hp,speed:speed,damage:t<0.6?8:(t<0.85?15:5),floatOffset:Math.random()*Math.PI*2,bodyMesh:body,glowMesh:glow,originalColor:color,tailMesh:tail};
+    scene.add(g); ghosts.push(g); updateGhostsCount();
+}
+
+function updateGhosts() {
+    const time=clock.getElapsedTime(); const pp=camera.position.clone();
+    for(let i=ghosts.length-1;i>=0;i--){
+        const g=ghosts[i],d=g.userData;
+        g.position.y=2+Math.sin(time*2+d.floatOffset)*0.8;
+        d.tailMesh.rotation.x=Math.sin(time*3+d.floatOffset)*0.3;
+        const dir=pp.clone().sub(g.position); dir.y=0; dir.normalize();
+        const zigzag=Math.sin(time*3+d.floatOffset)*0.3;
+        const md=dir.clone(); md.x+=zigzag*dir.z; md.z-=zigzag*dir.x; md.normalize();
+        g.position.add(md.multiplyScalar(d.speed*0.016)); g.lookAt(pp.x,g.position.y,pp.z);
+        if(isFlashlightOn&&battery>0){
+            camera.updateMatrixWorld();
+            const cd=new THREE.Vector3(); camera.getWorldDirection(cd);
+            const tg=g.position.clone().sub(camera.position).normalize();
+            const angle=cd.angleTo(tg); const dist=camera.position.distanceTo(g.position);
+            if(angle<0.35&&dist<35){
+                const dmg=2+(1-dist/35)*2; d.health-=dmg;
+                const dr=1-(d.health/d.maxHealth);
+                d.bodyMesh.material.color.setHex(0xff3333);
+                d.bodyMesh.material.opacity=0.35+dr*0.4;
+                d.glowMesh.material.opacity=0.08+dr*0.2;
+                if(d.health<=0){
+                    createGhostDeathEffect(g.position); scene.remove(g); ghosts.splice(i,1);
+                    score+=Math.floor(100*d.speed); ghostsKilled++;
+                    document.getElementById('score-text').textContent='النقاط: '+score;
+                    updateGhostsCount();
+                    document.getElementById('flash-overlay').style.opacity='0.4';
+                    setTimeout(()=>document.getElementById('flash-overlay').style.opacity='0',100);
+                    if(ghostsKilled>=totalGhosts)endGame(true);
+                    continue;
+                }
+            }else{
+                d.bodyMesh.material.color.setHex(d.originalColor);
+                d.bodyMesh.material.opacity=0.35; d.glowMesh.material.opacity=0.08;
+            }
+        }
+        if(g.position.distanceTo(pp)<3){
+            health-=d.damage*0.016;
+            document.getElementById('health-fill').style.width=Math.max(0,health)+'%';
+            document.getElementById('damage-overlay').style.opacity='0.6';
+            setTimeout(()=>document.getElementById('damage-overlay').style.opacity='0',150);
+            if(health<=0)endGame(false);
+        }
+    }
+}
+
+function createGhostDeathEffect(pos) {
+    for(let i=0;i<8;i++){
+        const p=new THREE.Mesh(new THREE.SphereGeometry(0.1,4,4),new THREE.MeshBasicMaterial({color:0x88ccff,transparent:true,opacity:0.8}));
+        p.position.copy(pos); p.userData={velocity:new THREE.Vector3((Math.random()-0.5)*3,Math.random()*3,(Math.random()-0.5)*3),life:1};
+        scene.add(p); setTimeout(()=>scene.remove(p),1000);
+    }
+}
+
+function updateGhostsCount() {
+    document.getElementById('ghosts-text').textContent='الأطياف: '+ghosts.length;
+}
+
+function checkInteractions() {
+    const pp=camera.position.clone();
+    const prompt=document.getElementById('pickup-prompt');
+    let showing=false;
+    for(let i=batteries.length-1;i>=0;i--){
+        const b=batteries[i]; if(!b.parent)continue;
+        const dist=pp.distanceTo(b.position);
+        if(dist<3){prompt.textContent='👆 اضغط للجمع - بطارية 🔋';prompt.classList.add('visible');showing=true;b.userData.canPickup=true;b.userData.glowMesh.material.opacity=0.3+Math.sin(clock.getElapsedTime()*5)*0.15;}
+        else{b.userData.canPickup=false;b.userData.glowMesh.material.opacity=0.15;}
+    }
+    if(chestMesh&&!chestOpened){
+        const dist=pp.distanceTo(chestMesh.position);
+        if(dist<3){prompt.textContent='👆 اضغط لفتح الصندوق 🔲';prompt.classList.add('visible');showing=true;chestMesh.userData.canOpen=true;chestMesh.userData.glowMesh.material.opacity=0.2+Math.sin(clock.getElapsedTime()*3)*0.1;}
+        else{chestMesh.userData.canOpen=false;chestMesh.userData.glowMesh.material.opacity=0.08;}
+    }
+    if(chestOpened&&buttonMesh&&buttonMesh.visible&&!hasButton){
+        const dist=pp.distanceTo(chestMesh.position);
+        if(dist<3){prompt.textContent='👆 اضغط لأخذ زر الطوارئ 🔴';prompt.classList.add('visible');showing=true;buttonMesh.userData.canTake=true;}
+        else{buttonMesh.userData.canTake=false;}
+    }
+    if(hasButton&&!buttonInstalled){
+        const lp=new THREE.Vector3(-8,0,-8); const dist=pp.distanceTo(lp);
+        if(dist<7){prompt.textContent='👆 اضغط لتثبيت الزر وتشغيل المنارة! 🏰';prompt.classList.add('visible');showing=true;lighthouseGroup.userData.canInstall=true;}
+        else{lighthouseGroup.userData.canInstall=false;}
+    }
+    if(!showing)prompt.classList.remove('visible');
+}
+
+function performAction() {
+    for(let i=batteries.length-1;i>=0;i--){
+        const b=batteries[i]; if(b.userData.canPickup){
+            scene.remove(b); batteries.splice(i,1);
+            battery=Math.min(100,battery+25);
+            document.getElementById('battery-text').textContent='🔋 '+Math.floor(battery)+'%';
+            document.getElementById('slot-battery').classList.add('active');
+            setTimeout(()=>document.getElementById('slot-battery').classList.remove('active'),500);
+            showMissionPrompt('جمعت بطارية! 🔋 +25%'); return;
+        }
+    }
+    if(chestMesh&&chestMesh.userData.canOpen&&!chestOpened){
+        chestOpened=true; let angle=0;
+        const interval=setInterval(()=>{angle+=0.05;chestLid.rotation.x=-angle;if(angle>=1.2){clearInterval(interval);buttonMesh.visible=true;showMissionPrompt('الصندوق مفتوح! خذ زر الطوارئ 🔴');missionStage=1;updateMissionText();}},30);
+        return;
+    }
+    if(buttonMesh&&buttonMesh.userData.canTake&&!hasButton){
+        hasButton=true;buttonMesh.visible=false;
+        document.getElementById('slot-button').classList.remove('empty');
+        document.getElementById('slot-button').textContent='🔴';
+        document.getElementById('slot-button').classList.add('active');
+        showMissionPrompt('حصلت على زر الطوارئ! ارجع للمنارة 🏰');
+        missionStage=2;updateMissionText();return;
+    }
+    if(lighthouseGroup.userData.canInstall&&hasButton&&!buttonInstalled){installButton();return;}
+}
+
+function installButton() {
+    buttonInstalled=true;hasButton=false;
+    document.getElementById('slot-button').textContent='🔲';
+    document.getElementById('slot-button').classList.remove('active');
+    document.getElementById('slot-button').classList.add('empty');
+    const btn=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,0.15,16),new THREE.MeshStandardMaterial({color:0x00ff00,emissive:0x00ff00,emissiveIntensity:1}));
+    btn.position.set(0,1.5,4); lighthouseGroup.add(btn);
+    showMissionPrompt('تم تثبيت الزر! المنارة تستيقظ... ⚡');
+    missionStage=3;updateMissionText();
+    lighthouseSaved=true; let intensity=0;
+    const up=setInterval(()=>{intensity+=0.05;lighthouseBeam.intensity=intensity;
+    const bulb=lighthouseGroup.children.find(c=>c.geometry&&c.geometry.type==='SphereGeometry'&&c.position.y===20.5);
+    if(bulb)bulb.material.color.setHex(0xffffaa);
+    if(intensity>=5){clearInterval(up);killAllGhosts();}},100);
+}
+
+function killAllGhosts() {
+    for(let i=ghosts.length-1;i>=0;i--){createGhostDeathEffect(ghosts[i].position);scene.remove(ghosts[i]);}
+    ghosts=[]; document.getElementById('flash-overlay').style.background='rgba(255,255,255,0.8)';
+    document.getElementById('flash-overlay').style.opacity='1';
+    setTimeout(()=>{document.getElementById('flash-overlay').style.background='rgba(255,255,200,0.3)';document.getElementById('flash-overlay').style.opacity='0';},1500);
+    score+=5000; document.getElementById('score-text').textContent='النقاط: '+score;
+    updateGhostsCount(); showMissionPrompt('🎉 المنارة أضاءت! جميع الأطياف تبخرت!');
+    setTimeout(()=>endGame(true),3000);
+}
+
+function showMissionPrompt(text) {
+    const el=document.getElementById('mission-prompt');el.textContent=text;el.classList.add('visible');
+    setTimeout(()=>el.classList.remove('visible'),3000);
+}
+
+function updateMissionText() {
+    const texts=['🔍 ابحث عن الصندوق في وسط الجزيرة','🔲 الصندوق مفتوح! خذ الزر','🔴 ارجع بزر الطوارئ إلى المنارة','⚡ المنارة تستيقظ!'];
+    document.getElementById('mission-text').textContent=texts[missionStage]||texts[0];
+}
+
+function setupControls() {
+    joystickZone.addEventListener('touchstart', handleJoystickStart, {passive:false});
+    joystickZone.addEventListener('touchmove', handleJoystickMove, {passive:false});
+    joystickZone.addEventListener('touchend', handleJoystickEnd, {passive:false});
+    joystickZone.addEventListener('touchcancel', handleJoystickEnd, {passive:false});
+    document.addEventListener('touchstart', handleTouchStart, {passive:false});
+    document.addEventListener('touchmove', handleTouchMove, {passive:false});
+    document.addEventListener('touchend', handleTouchEnd, {passive:false});
+    document.addEventListener('touchcancel', handleTouchEnd, {passive:false});
+    const flashBtn = document.getElementById('flashBtn');
+    flashBtn.addEventListener('touchstart', (e)=>{e.preventDefault();e.stopPropagation();isFlashlightOn=!isFlashlightOn;flashBtn.classList.toggle('off',!isFlashlightOn);});
+    flashBtn.addEventListener('touchend', (e)=>{e.preventDefault();});
+    flashBtn.addEventListener('pointerdown', (e)=>{e.preventDefault();e.stopPropagation();isFlashlightOn=!isFlashlightOn;flashBtn.classList.toggle('off',!isFlashlightOn);});
+    const actionBtn = document.getElementById('actionBtn');
+    actionBtn.addEventListener('touchstart', (e)=>{e.preventDefault();e.stopPropagation();performAction();actionBtn.style.transform='scale(0.88)';actionBtn.style.background='rgba(100,200,255,0.35)';});
+    actionBtn.addEventListener('touchend', (e)=>{e.preventDefault();actionBtn.style.transform='scale(1)';actionBtn.style.background='rgba(100,200,255,0.12)';});
+    actionBtn.addEventListener('touchcancel', (e)=>{e.preventDefault();actionBtn.style.transform='scale(1)';actionBtn.style.background='rgba(100,200,255,0.12)';});
+    actionBtn.addEventListener('pointerdown', (e)=>{e.preventDefault();e.stopPropagation();performAction();});
+    document.addEventListener('keydown', (e)=>{
+        if(!isGameActive)return;
+        switch(e.code){
+            case 'KeyW':moveVector.y=1;break;case 'KeyS':moveVector.y=-1;break;
+            case 'KeyA':moveVector.x=-1;break;case 'KeyD':moveVector.x=1;break;
+            case 'KeyE':case 'Space':performAction();break;
+            case 'KeyF':isFlashlightOn=!isFlashlightOn;document.getElementById('flashBtn').classList.toggle('off',!isFlashlightOn);break;
+            case 'Escape':if(isGameActive){isPaused?closeSettings():openSettings();}break;
+        }
+    });
+    document.addEventListener('keyup', (e)=>{
+        switch(e.code){case 'KeyW':case 'KeyS':moveVector.y=0;break;case 'KeyA':case 'KeyD':moveVector.x=0;break;}
+    });
+    document.addEventListener('mousemove', (e)=>{
+        if(!isGameActive||isPaused)return;
+        if(document.pointerLockElement===renderer.domElement){
+            const sens=settings.lookSensitivity/50;
+            targetRotation.y -= e.movementX*0.002*sens;
+            targetRotation.x -= e.movementY*0.002*sens;
+            targetRotation.x = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, targetRotation.x));
+            targetRotation.y = ((targetRotation.y + Math.PI) % (Math.PI * 2)) - Math.PI;
+        }
+    });
+    renderer.domElement.addEventListener('click', ()=>{
+        if(isGameActive&&!isPaused)renderer.domElement.requestPointerLock();
+    });
+}
+
+function exitSettingsWithoutSave() {
+    // إعادة تحميل الإعدادات المحفوظة وإغلاق
+    loadSettings();
+    document.getElementById('settingsScreen').classList.remove('visible');
+    isPaused = false;
+    prevTime = performance.now();
+    if (settings.wakeLock) requestWakeLock();
+}
+
+function quitToMenu() {
+    // إيقاف اللعبة والعودة للقائمة الرئيسية
+    isGameActive = false;
+    isPaused = false;
+    releaseWakeLock();
+    exitFullscreen();
+    document.getElementById('settingsScreen').classList.remove('visible');
+    document.getElementById('gameOverScreen').classList.add('hidden');
+    document.getElementById('startScreen').classList.remove('hidden');
+    document.getElementById('settings-btn').classList.remove('visible');
+    document.getElementById('fullscreen-btn').classList.remove('visible');
+    document.getElementById('status-bar').classList.remove('visible');
+    // تنظيف الأشباح
+    ghosts.forEach(g=>scene.remove(g)); ghosts=[];
+    // إعادة تعيين الكاميرا
+    camera.position.set(0, 3, 15);
+    targetRotation={x:0,y:0}; cameraRotation={x:0,y:0};
+    camera.rotation.x=0; camera.rotation.y=0;
+}
+
+function setupSettings() {
+    document.getElementById('settings-btn').addEventListener('click', openSettings);
+    document.getElementById('fullscreen-btn').addEventListener('click', toggleFullscreen);
+    document.getElementById('closeSettingsBtn').addEventListener('click', closeSettings);
+    document.getElementById('exitSettingsBtn').addEventListener('click', exitSettingsWithoutSave);
+    document.getElementById('quitGameBtn').addEventListener('click', quitToMenu);
+    document.getElementById('lookSensSlider').addEventListener('input', (e)=>{
+        settings.lookSensitivity=parseInt(e.target.value);
+        document.getElementById('lookSensValue').textContent=settings.lookSensitivity+'%';
+        saveSettings();
+    });
+    document.getElementById('moveSensSlider').addEventListener('input', (e)=>{
+        settings.moveSensitivity=parseInt(e.target.value);
+        document.getElementById('moveSensValue').textContent=settings.moveSensitivity+'%';
+        saveSettings();
+    });
+    document.getElementById('touchLookToggle').addEventListener('click', function(){
+        settings.touchLookMode=!settings.touchLookMode;
+        this.classList.toggle('active',settings.touchLookMode);
+        saveSettings();
+    });
+    document.getElementById('smoothToggle').addEventListener('click', function(){
+        settings.smoothCamera=!settings.smoothCamera;
+        this.classList.toggle('active',settings.smoothCamera);
+        saveSettings();
+    });
+    document.getElementById('showJoystickToggle').addEventListener('click', function(){
+        settings.showJoystick=!settings.showJoystick;
+        this.classList.toggle('active',settings.showJoystick);
+        document.getElementById('joystick-zone').style.display=settings.showJoystick?'block':'none';
+        saveSettings();
+    });
+    document.getElementById('wakeLockToggle').addEventListener('click', function(){
+        settings.wakeLock=!settings.wakeLock;
+        this.classList.toggle('active',settings.wakeLock);
+        if(settings.wakeLock&&isGameActive)requestWakeLock();
+        else releaseWakeLock();
+        saveSettings();
+    });
+}
+
+function handleTouchStart(e) {
+    if(!isGameActive||isPaused)return;
+    for(let i=0;i<e.changedTouches.length;i++){
+        const t=e.changedTouches[i];
+        const el=document.elementFromPoint(t.clientX,t.clientY);
+        if(el&&(el.closest('#joystick-zone')||el.closest('.action-btn')||el.closest('#settings-btn')||el.closest('#fullscreen-btn')))continue;
+        if(settings.touchLookMode&&t.clientX>window.innerWidth*0.35&&lookTouchId===null){
+            lookTouchId=t.identifier;
+            lookStartPos.x=t.clientX; lookStartPos.y=t.clientY;
+            lookCurrentPos.x=t.clientX; lookCurrentPos.y=t.clientY;
+        }
+    }
+}
+
+function handleTouchMove(e) {
+    if(!isGameActive||isPaused||lookTouchId===null)return;
+    for(let i=0;i<e.changedTouches.length;i++){
+        const t=e.changedTouches[i];
+        if(t.identifier===lookTouchId){
+            e.preventDefault();
+            const sens=settings.lookSensitivity/50;
+            const dx=(t.clientX-lookCurrentPos.x)*0.004*sens;
+            const dy=(t.clientY-lookCurrentPos.y)*0.004*sens;
+            targetRotation.y -= dx;
+            targetRotation.x -= dy;
+            // تقييد النظر لأعلى/أسفل
+            targetRotation.x = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, targetRotation.x));
+            // تطبيع الدوران الأفقي إلى -PI إلى PI
+            targetRotation.y = ((targetRotation.y + Math.PI) % (Math.PI * 2)) - Math.PI;
+            lookCurrentPos.x=t.clientX; lookCurrentPos.y=t.clientY;
+        }
+    }
+}
+
+function handleTouchEnd(e) {
+    for(let i=0;i<e.changedTouches.length;i++){
+        if(e.changedTouches[i].identifier===lookTouchId)lookTouchId=null;
+    }
+}
+
+function handleJoystickStart(e) {
+    e.preventDefault();
+    const touch=e.changedTouches[0];
+    const rect=joystickZone.getBoundingClientRect();
+    joystickActive=true;
+    joystickStart.x=rect.left+rect.width/2;
+    joystickStart.y=rect.top+rect.height/2;
+    joystickStick.classList.add('active');
+    updateJoystick(touch.clientX,touch.clientY);
+}
+function handleJoystickMove(e) {
+    if(!joystickActive)return; e.preventDefault();
+    for(let i=0;i<e.changedTouches.length;i++){
+        const t=e.changedTouches[i];
+        if(Math.abs(t.clientX-joystickStart.x)<120&&Math.abs(t.clientY-joystickStart.y)<120){
+            updateJoystick(t.clientX,t.clientY);break;
+        }
+    }
+}
+function handleJoystickEnd(e) {
+    e.preventDefault(); joystickActive=false;
+    joystickStick.style.transform='translate(0px,0px)';
+    joystickStick.classList.remove('active');
+    moveVector.set(0,0);
+}
+function updateJoystick(x,y) {
+    const maxDist=45;
+    let dx=x-joystickStart.x, dy=y-joystickStart.y;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    if(dist>maxDist){dx=(dx/dist)*maxDist;dy=(dy/dist)*maxDist;}
+    joystickStick.style.transform=`translate(${dx}px,${dy}px)`;
+    moveVector.x=dx/maxDist; moveVector.y=-dy/maxDist;
+}
+
+function updateMovement() {
+    if(!isGameActive||isPaused)return;
+    const smooth=settings.smoothCamera?0.12:1.0;
+    cameraRotation.x+=(targetRotation.x-cameraRotation.x)*smooth;
+    cameraRotation.y+=(targetRotation.y-cameraRotation.y)*smooth;
+    // تقييد النظر لأعلى/أسفل لتجنب الانقلاب
+    cameraRotation.x = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, cameraRotation.x));
+    camera.rotation.x = cameraRotation.x;
+    camera.rotation.y = cameraRotation.y;
+    // تحديث matrixWorld مباشرة لضمان صحة getWorldDirection
+    camera.updateMatrixWorld();
+    const moveSens=settings.moveSensitivity/50;
+    const speed=6*moveSens;
+    const forward=new THREE.Vector3(-Math.sin(cameraRotation.y),0,-Math.cos(cameraRotation.y));
+    const right=new THREE.Vector3(Math.cos(cameraRotation.y),0,-Math.sin(cameraRotation.y));
+    const md=new THREE.Vector3();
+    md.addScaledVector(forward,moveVector.y);
+    md.addScaledVector(right,moveVector.x);
+    if(md.length()>1)md.normalize();
+    camera.position.add(md.multiplyScalar(speed*0.016));
+    const dist=Math.sqrt(camera.position.x**2+camera.position.z**2);
+    if(dist>58){const a=Math.atan2(camera.position.z,camera.position.x);camera.position.x=Math.cos(a)*58;camera.position.z=Math.sin(a)*58;}
+    camera.position.y=3;
+}
+
+function updateLighthouse() {
+    const t=clock.getElapsedTime();
+    if(lighthouseBeam&&lighthouseBeam.target){
+        lighthouseBeam.target.position.x=Math.cos(t*0.4)*40;
+        lighthouseBeam.target.position.z=Math.sin(t*0.4)*40;
+        lighthouseBeam.target.updateMatrixWorld();
+    }
+}
+function updateWater() {
+    if(waterMesh){waterMesh.position.y=-2.5+Math.sin(clock.getElapsedTime()*0.5)*0.15;}
+}
+function updateParticles() {
+    const t=clock.getElapsedTime();
+    particles.forEach(p=>{p.rotation.y=t*0.05;});
+}
+function onWindowResize() {
+    camera.aspect=window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth,window.innerHeight);
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    if(isGameActive&&!isPaused){
+        updateMovement();
+        updateFlashlight();
+        updateGhosts();
+        updateLighthouse();
+        updateWater();
+        updateParticles();
+        checkInteractions();
+        if(!lighthouseSaved){
+            const maxGhosts=2+Math.floor(ghostsKilled/5)+1;
+            if(ghosts.length<maxGhosts&&ghostsKilled+ghosts.length<totalGhosts){
+                if(Math.random()<0.008)spawnGhost();
+            }
+        }
+    }
+    renderer.render(scene,camera);
+}
+
+function startGame() {
+    document.getElementById('startScreen').classList.add('hidden');
+    document.getElementById('gameOverScreen').classList.add('hidden');
+    document.getElementById('settings-btn').classList.add('visible');
+    document.getElementById('fullscreen-btn').classList.add('visible');
+    document.getElementById('status-bar').classList.add('visible');
+    isGameActive=true; isPaused=false;
+    health=100; score=0; battery=100;
+    ghostsKilled=0; missionStage=0;
+    hasButton=false; buttonInstalled=false; chestOpened=false; lighthouseSaved=false;
+    ghosts.forEach(g=>scene.remove(g)); ghosts=[];
+    batteries.forEach(b=>scene.remove(b)); batteries=[]; createBatteries();
+    if(chestMesh)scene.remove(chestMesh); createChest();
+    lighthouseBeam.intensity=0.5;
+    const bulb=lighthouseGroup.children.find(c=>c.geometry&&c.geometry.type==='SphereGeometry'&&c.position.y===20.5);
+    if(bulb)bulb.material.color.setHex(0x443322);
+    document.getElementById('health-fill').style.width='100%';
+    document.getElementById('score-text').textContent='النقاط: 0';
+    document.getElementById('battery-text').textContent='🔋 100%';
+    document.getElementById('slot-button').textContent='🔲';
+    document.getElementById('slot-button').classList.add('empty');
+    document.getElementById('slot-button').classList.remove('active');
+    updateMissionText();
+    camera.position.set(0,3,15);
+    targetRotation={x:0,y:0}; cameraRotation={x:0,y:0};
+    for(let i=0;i<3;i++)setTimeout(()=>spawnGhost(),i*1500);
+
+    // تفعيل الشاشة الكاملة وقفل الشاشة
+    enterFullscreen();
+    if(settings.wakeLock)requestWakeLock();
+}
+
+function endGame(won) {
+    isGameActive=false; isPaused=false;
+    document.getElementById('settings-btn').classList.remove('visible');
+    document.getElementById('fullscreen-btn').classList.remove('visible');
+    document.getElementById('status-bar').classList.remove('visible');
+    releaseWakeLock();
+    const screen=document.getElementById('gameOverScreen');
+    const title=document.getElementById('endTitle');
+    const msg=document.getElementById('endMessage');
+    const scoreEl=document.getElementById('finalScore');
+    screen.classList.remove('hidden');
+    if(won){
+        title.textContent='🏆 انتصرت!';
+        title.style.color='#44ff44';
+        if(lighthouseSaved){msg.innerHTML='أعدت إضاءة المنارة!<br>الضوء الساطع أباد جميع الأطياف المظلمة';}
+        else{msg.innerHTML='أنقذت المنارة من الأطياف!<br>الجزيرة آمنة الآن...';}
+    }else{
+        title.textContent='💀 لقد مات!';
+        title.style.color='#ff4444';
+        msg.innerHTML='الأطياف تغلبت عليك...<br>المنارة الآن في قبضة الظلام الأبدي';
+    }
+    scoreEl.textContent='⭐ النقاط: '+score+' | الأطياف: '+ghostsKilled;
+}
+
+document.getElementById('startBtn').addEventListener('click',startGame);
+document.getElementById('restartBtn').addEventListener('click',startGame);
+document.addEventListener('contextmenu',e=>e.preventDefault());
+
+init();
+animate();
+</script>
+</body>
+</html>
